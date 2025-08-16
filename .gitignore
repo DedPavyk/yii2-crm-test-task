@@ -1,33 +1,21 @@
-# phpstorm project files
-.idea
+# Yii2
+/runtime/*
+!/runtime/.gitkeep
+/web/assets/*
+/web/runtime/*
+/vendor/*
+!/vendor/.gitkeep
 
-# netbeans project files
-nbproject
+# Композер
+/composer.lock
 
-# zend studio for eclipse project files
-.buildpath
-.project
-.settings
+# IDE
+/.idea
+/.vscode
 
-# windows thumbnail cache
+# Системные файлы
+.DS_Store
 Thumbs.db
 
-# composer vendor dir
-/vendor
-
-# composer itself is not needed
-composer.phar
-
-# Mac DS_Store Files
-.DS_Store
-
-# phpunit itself is not needed
-phpunit.phar
-# local phpunit config
-/phpunit.xml
-
-tests/_output/*
-tests/_support/_generated
-
-#vagrant folder
-/.vagrant
+# Конфиги с данными для доступа
+/config/db.php
