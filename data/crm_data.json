@@ -1,0 +1,18 @@
+{
+    "deals": [
+        {
+            "id": 1,
+            "name": "Хотят люстру",
+            "amount": 15000,
+            "contacts": [15, 25]
+        }
+    ],
+    "contacts": [
+        {
+            "id": 15,
+            "firstName": "Иван",
+            "lastName": "Петров", 
+            "deals": [1, 14, 2]
+        }
+    ]
+}
