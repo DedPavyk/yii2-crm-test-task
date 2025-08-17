@@ -54,7 +54,8 @@ class Contact extends Model
             $contact->id = $contactData['id'];
             $contact->firstName = $contactData['firstName'];
             $contact->lastName = $contactData['lastName'];
-            $contact->deals = $contactData['deals'];
+            // Убеждаемся, что deals - это массив
+            $contact->deals = is_array($contactData['deals']) ? $contactData['deals'] : [];
             $contacts[] = $contact;
         }
         
@@ -74,7 +75,8 @@ class Contact extends Model
                 $contact->id = $contactData['id'];
                 $contact->firstName = $contactData['firstName'];
                 $contact->lastName = $contactData['lastName'];
-                $contact->deals = $contactData['deals'];
+                // Убеждаемся, что deals - это массив
+                $contact->deals = is_array($contactData['deals']) ? $contactData['deals'] : [];
                 return $contact;
             }
         }
@@ -87,47 +89,81 @@ class Contact extends Model
      */
     public function save()
     {
+        Yii::info('Начало сохранения контакта: ' . json_encode($this->attributes), 'contact/save');
+        
         if (!$this->validate()) {
+            Yii::error('Ошибки валидации: ' . json_encode($this->errors), 'contact/save');
             return false;
         }
 
-        $data = self::loadData();
-        
-        if ($this->id) {
-            // Обновление существующего
-            foreach ($data['contacts'] as &$contact) {
-                if ($contact['id'] == $this->id) {
-                    $oldDeals = $contact['deals'];
-                    $contact['firstName'] = $this->firstName;
-                    $contact['lastName'] = $this->lastName;
-                    $contact['deals'] = $this->deals;
-                    
-                    // Обновляем связи в сделках
-                    $this->updateDealReferences($data, $this->id, $oldDeals, $this->deals);
-                    break;
+        try {
+            // Убеждаемся, что deals - это массив
+            if (!is_array($this->deals)) {
+                if (is_string($this->deals) && !empty($this->deals)) {
+                    // Пытаемся разобрать JSON
+                    $decoded = json_decode($this->deals, true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                        $this->deals = $decoded;
+                    } else {
+                        $this->deals = [$this->deals];
+                    }
+                } else {
+                    $this->deals = [];
                 }
             }
-        } else {
-            // Создание нового
-            $this->id = $this->getNextId($data);
-            $data['contacts'][] = [
-                'id' => $this->id,
-                'firstName' => $this->firstName,
-                'lastName' => $this->lastName,
-                'deals' => $this->deals,
-            ];
             
-            // Добавляем связи в сделках
-            foreach ($this->deals as $dealId) {
-                foreach ($data['deals'] as &$deal) {
-                    if ($deal['id'] == $dealId && !in_array($this->id, $deal['contacts'])) {
-                        $deal['contacts'][] = $this->id;
+            // Убираем дубликаты и пустые значения
+            $this->deals = array_filter(array_unique($this->deals), function($value) {
+                return !empty($value) && is_numeric($value);
+            });
+            
+            $data = self::loadData();
+            Yii::info('Данные загружены, контактов: ' . count($data['contacts']), 'contact/save');
+            
+            if ($this->id) {
+                // Обновление существующего
+                Yii::info('Обновление существующего контакта с ID: ' . $this->id, 'contact/save');
+                foreach ($data['contacts'] as &$contact) {
+                    if ($contact['id'] == $this->id) {
+                        $oldDeals = is_array($contact['deals']) ? $contact['deals'] : [];
+                        $contact['firstName'] = $this->firstName;
+                        $contact['lastName'] = $this->lastName;
+                        $contact['deals'] = $this->deals;
+                        
+                        // Обновляем связи в сделках
+                        $this->updateDealReferences($data, $this->id, $oldDeals, $this->deals);
+                        break;
+                    }
+                }
+            } else {
+                // Создание нового
+                $this->id = $this->getNextId($data);
+                Yii::info('Создание нового контакта с ID: ' . $this->id, 'contact/save');
+                $data['contacts'][] = [
+                    'id' => $this->id,
+                    'firstName' => $this->firstName,
+                    'lastName' => $this->lastName,
+                    'deals' => $this->deals,
+                ];
+                
+                // Добавляем связи в сделках
+                foreach ($this->deals as $dealId) {
+                    foreach ($data['deals'] as &$deal) {
+                        if ($deal['id'] == $dealId && !in_array($this->id, $deal['contacts'])) {
+                            $deal['contacts'][] = $this->id;
+                        }
                     }
                 }
             }
+            
+            $result = self::saveData($data);
+            Yii::info('Результат сохранения: ' . ($result ? 'успешно' : 'ошибка'), 'contact/save');
+            return $result;
+            
+        } catch (\Exception $e) {
+            Yii::error('Исключение при сохранении контакта: ' . $e->getMessage() . ' в файле ' . $e->getFile() . ' на строке ' . $e->getLine(), 'contact/save');
+            return false;
         }
-        
-        return self::saveData($data);
     }
 
     /**
@@ -137,12 +173,19 @@ class Contact extends Model
     {
         $data = self::loadData();
         
+        // Убеждаемся, что deals - это массив
+        $deals = is_array($this->deals) ? $this->deals : [];
+        
         // Удаляем связи из сделок
-        foreach ($this->deals as $dealId) {
+        foreach ($deals as $dealId) {
             foreach ($data['deals'] as &$deal) {
                 if ($deal['id'] == $dealId) {
-                    $deal['contacts'] = array_values(array_filter($deal['contacts'], 
-                        function($contactId) { return $contactId != $this->id; }));
+                    if (is_array($deal['contacts'])) {
+                        $deal['contacts'] = array_values(array_filter($deal['contacts'], 
+                            function($contactId) { return $contactId != $this->id; }));
+                    } else {
+                        $deal['contacts'] = [];
+                    }
                 }
             }
         }
@@ -170,7 +213,10 @@ class Contact extends Model
         $data = self::loadData();
         $relatedDeals = [];
         
-        foreach ($this->deals as $dealId) {
+        // Убеждаемся, что deals - это массив
+        $deals = is_array($this->deals) ? $this->deals : [];
+        
+        foreach ($deals as $dealId) {
             foreach ($data['deals'] as $dealData) {
                 if ($dealData['id'] == $dealId) {
                     $relatedDeals[] = $dealData;
@@ -187,6 +233,10 @@ class Contact extends Model
      */
     private function updateDealReferences(&$data, $contactId, $oldDeals, $newDeals)
     {
+        // Убеждаемся, что это массивы
+        $oldDeals = is_array($oldDeals) ? $oldDeals : [];
+        $newDeals = is_array($newDeals) ? $newDeals : [];
+        
         $toRemove = array_diff($oldDeals, $newDeals);
         $toAdd = array_diff($newDeals, $oldDeals);
         
@@ -194,8 +244,12 @@ class Contact extends Model
         foreach ($toRemove as $dealId) {
             foreach ($data['deals'] as &$deal) {
                 if ($deal['id'] == $dealId) {
-                    $deal['contacts'] = array_values(array_filter($deal['contacts'], 
-                        function($id) use ($contactId) { return $id != $contactId; }));
+                    if (is_array($deal['contacts'])) {
+                        $deal['contacts'] = array_values(array_filter($deal['contacts'], 
+                            function($id) use ($contactId) { return $id != $contactId; }));
+                    } else {
+                        $deal['contacts'] = [];
+                    }
                 }
             }
         }
@@ -203,8 +257,13 @@ class Contact extends Model
         // Добавляем новые связи
         foreach ($toAdd as $dealId) {
             foreach ($data['deals'] as &$deal) {
-                if ($deal['id'] == $dealId && !in_array($contactId, $deal['contacts'])) {
-                    $deal['contacts'][] = $contactId;
+                if ($deal['id'] == $dealId) {
+                    if (!is_array($deal['contacts'])) {
+                        $deal['contacts'] = [];
+                    }
+                    if (!in_array($contactId, $deal['contacts'])) {
+                        $deal['contacts'][] = $contactId;
+                    }
                 }
             }
         }
@@ -213,21 +272,19 @@ class Contact extends Model
     /**
      * Загрузить данные из файла
      */
-    private static function loadData()
+    public static function loadData()
     {
         $file = Yii::getAlias(self::$dataFile);
+        Yii::info('Загрузка данных из файла: ' . $file, 'contact/loadData');
         
         if (!file_exists($file)) {
+            Yii::info('Файл данных не существует, создаю по умолчанию', 'contact/loadData');
             $defaultData = [
                 'deals' => [
-                    ['id' => 1, 'name' => 'Хотят люстру', 'amount' => 15000, 'contacts' => [15, 25]],
-                    ['id' => 14, 'name' => 'Хотят светильник', 'amount' => 8000, 'contacts' => [15]],
-                    ['id' => 2, 'name' => 'Пока думают', 'amount' => 4000, 'contacts' => [15, 25]],
+                    ['id' => 1, 'name' => 'Хотят люстру', 'amount' => 15000, 'contacts' => [15]],
                 ],
                 'contacts' => [
-                    ['id' => 15, 'firstName' => 'Иван', 'lastName' => 'Петров', 'deals' => [1, 14, 2]],
-                    ['id' => 25, 'firstName' => 'Наталья', 'lastName' => 'Сидорова', 'deals' => [1, 2]],
-                    ['id' => 30, 'firstName' => 'Василий', 'lastName' => 'Иванов', 'deals' => []],
+                    ['id' => 15, 'firstName' => 'Иван', 'lastName' => 'Петров', 'deals' => [1]],
                 ]
             ];
             
@@ -235,20 +292,29 @@ class Contact extends Model
                 mkdir(dirname($file), 0755, true);
             }
             
-            file_put_contents($file, Json::encode($defaultData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            $result = file_put_contents($file, Json::encode($defaultData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            Yii::info('Создание файла по умолчанию: ' . ($result !== false ? 'успешно' : 'ошибка'), 'contact/loadData');
             return $defaultData;
         }
         
-        return Json::decode(file_get_contents($file));
+        $content = file_get_contents($file);
+        $data = Json::decode($content);
+        Yii::info('Данные загружены из файла, контактов: ' . count($data['contacts']) . ', сделок: ' . count($data['deals']), 'contact/loadData');
+        return $data;
     }
 
     /**
      * Сохранить данные в файл
      */
-    private static function saveData($data)
+    public static function saveData($data)
     {
         $file = Yii::getAlias(self::$dataFile);
-        return file_put_contents($file, Json::encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) !== false;
+        Yii::info('Сохранение данных в файл: ' . $file, 'contact/saveData');
+        
+        $result = file_put_contents($file, Json::encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        $success = $result !== false;
+        Yii::info('Результат сохранения в файл: ' . ($success ? 'успешно' : 'ошибка'), 'contact/saveData');
+        return $success;
     }
 
     /**

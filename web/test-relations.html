@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Тест связей CRM</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        .success { color: green; }
+        .error { color: red; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 3px; }
+        .form-group { margin: 10px 0; }
+        label { display: inline-block; width: 120px; }
+        input, select { padding: 5px; width: 200px; }
+    </style>
+</head>
+<body>
+    <h1>Тест связей между контактами и сделками</h1>
+    
+    <div class="section">
+        <h2>Создать связь</h2>
+        <div class="form-group">
+            <label>Контакт:</label>
+            <select id="contactSelect">
+                <option value="">Выберите контакт</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Сделка:</label>
+            <select id="dealSelect">
+                <option value="">Выберите сделку</option>
+            </select>
+        </div>
+        <button onclick="createRelation()">Создать связь</button>
+        <div id="relationResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Действия</h2>
+        <button onclick="loadData()">Загрузить данные</button>
+        <button onclick="synchronize()">Синхронизировать</button>
+        <button onclick="showRawData()">Показать сырые данные</button>
+    </div>
+    
+    <div class="section">
+        <h2>Текущие связи</h2>
+        <div id="relationsDisplay"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Результаты</h2>
+        <div id="results"></div>
+    </div>
+    
+    <script>
+        let contacts = [];
+        let deals = [];
+        
+        function loadData() {
+            showMessage('Загрузка данных...', 'info');
+            
+            Promise.all([
+                fetch('/site/get-list?type=contacts').then(r => r.json()),
+                fetch('/site/get-list?type=deals').then(r => r.json())
+            ]).then(([contactsData, dealsData]) => {
+                contacts = contactsData;
+                deals = dealsData;
+                
+                // Заполняем селекты
+                fillContactSelect();
+                fillDealSelect();
+                
+                // Показываем связи
+                displayRelations();
+                
+                showMessage('Данные загружены', 'success');
+            }).catch(error => {
+                showMessage('Ошибка загрузки: ' + error.message, 'error');
+            });
+        }
+        
+        function fillContactSelect() {
+            const select = document.getElementById('contactSelect');
+            select.innerHTML = '<option value="">Выберите контакт</option>';
+            
+            contacts.forEach(contact => {
+                const option = document.createElement('option');
+                option.value = contact.id;
+                option.textContent = `${contact.id}: ${contact.name}`;
+                select.appendChild(option);
+            });
+        }
+        
+        function fillDealSelect() {
+            const select = document.getElementById('dealSelect');
+            select.innerHTML = '<option value="">Выберите сделку</option>';
+            
+            deals.forEach(deal => {
+                const option = document.createElement('option');
+                option.value = deal.id;
+                option.textContent = `${deal.id}: ${deal.name}`;
+                select.appendChild(option);
+            });
+        }
+        
+        function createRelation() {
+            const contactId = document.getElementById('contactSelect').value;
+            const dealId = document.getElementById('dealSelect').value;
+            
+            if (!contactId || !dealId) {
+                showMessage('Выберите контакт и сделку', 'error');
+                return;
+            }
+            
+            showMessage('Создание связи...', 'info');
+            
+            // Получаем текущие данные контакта
+            fetch(`/site/get-details?type=contacts&id=${contactId}`)
+                .then(response => response.json())
+                .then(contactData => {
+                    // Добавляем сделку к контакту
+                    const updatedContact = {
+                        type: 'contacts',
+                        id: contactId,
+                        firstName: contactData.firstName,
+                        lastName: contactData.lastName,
+                        deals: [...(contactData.deals || []), parseInt(dealId)]
+                    };
+                    
+                    return fetch('/site/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(updatedContact)
+                    });
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        showMessage('Связь создана!', 'success');
+                        setTimeout(loadData, 500);
+                    } else {
+                        showMessage('Ошибка создания связи: ' + result.error, 'error');
+                    }
+                })
+                .catch(error => {
+                    showMessage('Ошибка: ' + error.message, 'error');
+                });
+        }
+        
+        function displayRelations() {
+            let html = '<h3>Контакты и их сделки:</h3>';
+            
+            contacts.forEach(contact => {
+                html += `<p><strong>${contact.id}: ${contact.name}</strong> - сделки: `;
+                
+                // Получаем детали контакта для отображения связанных сделок
+                fetch(`/site/get-details?type=contacts&id=${contact.id}`)
+                    .then(response => response.json())
+                    .then(contactDetails => {
+                        if (contactDetails && contactDetails.relatedDeals && contactDetails.relatedDeals.length > 0) {
+                            const dealsList = contactDetails.relatedDeals.map(deal => 
+                                `${deal.id}: ${deal.name}`
+                            ).join(', ');
+                            html += dealsList;
+                        } else {
+                            html += 'нет связанных сделок';
+                        }
+                        html += '</p>';
+                        
+                        // Обновляем отображение
+                        document.getElementById('relationsDisplay').innerHTML = html;
+                    })
+                    .catch(error => {
+                        html += 'ошибка загрузки</p>';
+                        document.getElementById('relationsDisplay').innerHTML = html;
+                    });
+            });
+            
+            html += '<h3>Сделки и их контакты:</h3>';
+            
+            deals.forEach(deal => {
+                html += `<p><strong>${deal.id}: ${deal.name}</strong> - контакты: `;
+                
+                // Получаем детали сделки для отображения связанных контактов
+                fetch(`/site/get-details?type=deals&id=${deal.id}`)
+                    .then(response => response.json())
+                    .then(dealDetails => {
+                        if (dealDetails && dealDetails.relatedContacts && dealDetails.relatedContacts.length > 0) {
+                            const contactsList = dealDetails.relatedContacts.map(contact => 
+                                `${contact.id}: ${contact.firstName} ${contact.lastName}`
+                            ).join(', ');
+                            html += contactsList;
+                        } else {
+                            html += 'нет связанных контактов';
+                        }
+                        html += '</p>';
+                        
+                        // Обновляем отображение
+                        const currentHtml = document.getElementById('relationsDisplay').innerHTML;
+                        document.getElementById('relationsDisplay').innerHTML = currentHtml + html;
+                    })
+                    .catch(error => {
+                        html += 'ошибка загрузки</p>';
+                        const currentHtml = document.getElementById('relationsDisplay').innerHTML;
+                        document.getElementById('relationsDisplay').innerHTML = currentHtml + html;
+                    });
+            });
+        }
+        
+        function synchronize() {
+            showMessage('Синхронизация...', 'info');
+            
+            fetch('/site/synchronize')
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        showMessage('Синхронизация успешна!', 'success');
+                        setTimeout(loadData, 500);
+                    } else {
+                        showMessage('Ошибка синхронизации: ' + result.error, 'error');
+                    }
+                })
+                .catch(error => {
+                    showMessage('Ошибка: ' + error.message, 'error');
+                });
+        }
+        
+        function showRawData() {
+            fetch('/site/get-list?type=contacts')
+                .then(response => response.json())
+                .then(contacts => {
+                    let html = '<h3>Сырые данные контактов:</h3><pre>' + JSON.stringify(contacts, null, 2) + '</pre>';
+                    
+                    fetch('/site/get-list?type=deals')
+                        .then(response => response.json())
+                        .then(deals => {
+                            html += '<h3>Сырые данные сделок:</h3><pre>' + JSON.stringify(deals, null, 2) + '</pre>';
+                            document.getElementById('results').innerHTML = html;
+                        });
+                });
+        }
+        
+        function showMessage(message, type) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `<div class="${type}">${message}</div>`;
+        }
+        
+        // Автоматически загружаем данные при открытии страницы
+        window.onload = function() {
+            loadData();
+        };
+    </script>
+</body>
+</html>

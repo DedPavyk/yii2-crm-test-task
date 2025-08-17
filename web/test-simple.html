@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Простой тест CRM</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        .success { color: green; }
+        .error { color: red; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 3px; }
+        .data-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        .data-table th, .data-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .data-table th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>Простой тест CRM</h1>
+    
+    <div class="section">
+        <h2>Действия</h2>
+        <button onclick="loadData()">Загрузить данные</button>
+        <button onclick="testEdit()">Тест редактирования</button>
+        <button onclick="synchronize()">Синхронизировать</button>
+    </div>
+    
+    <div class="section">
+        <h2>Данные</h2>
+        <div id="dataDisplay"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Результаты</h2>
+        <div id="results"></div>
+    </div>
+    
+    <script>
+        function loadData() {
+            showMessage('Загрузка данных...', 'info');
+            
+            Promise.all([
+                fetch('/index.php?r=site/get-list&type=contacts').then(r => r.json()),
+                fetch('/index.php?r=site/get-list&type=deals').then(r => r.json())
+            ]).then(([contacts, deals]) => {
+                console.log('Полученные данные:', { contacts, deals });
+                
+                if (Array.isArray(contacts) && Array.isArray(deals)) {
+                    displayData(contacts, deals);
+                    showMessage('Данные загружены успешно', 'success');
+                } else {
+                    showMessage('Ошибка: API вернул не массив', 'error');
+                    console.error('Неверный формат данных:', { contacts, deals });
+                }
+            }).catch(error => {
+                showMessage('Ошибка загрузки: ' + error.message, 'error');
+                console.error('Ошибка:', error);
+            });
+        }
+        
+        function displayData(contacts, deals) {
+            let html = '<h3>Контакты:</h3>';
+            html += '<table class="data-table">';
+            html += '<tr><th>ID</th><th>Имя</th><th>Фамилия</th><th>Связанные сделки</th></tr>';
+            
+            contacts.forEach(contact => {
+                const dealsList = contact.deals && contact.deals.length > 0 ? contact.deals.join(', ') : 'Нет';
+                html += `<tr>
+                    <td>${contact.id}</td>
+                    <td>${contact.firstName || 'N/A'}</td>
+                    <td>${contact.lastName || 'N/A'}</td>
+                    <td>${dealsList}</td>
+                </tr>`;
+            });
+            
+            html += '</table>';
+            
+            html += '<h3>Сделки:</h3>';
+            html += '<table class="data-table">';
+            html += '<tr><th>ID</th><th>Название</th><th>Сумма</th><th>Связанные контакты</th></tr>';
+            
+            deals.forEach(deal => {
+                const contactsList = deal.contacts && deal.contacts.length > 0 ? deal.contacts.join(', ') : 'Нет';
+                html += `<tr>
+                    <td>${deal.id}</td>
+                    <td>${deal.name}</td>
+                    <td>${deal.amount || 'N/A'}</td>
+                    <td>${contactsList}</td>
+                </tr>`;
+            });
+            
+            html += '</table>';
+            
+            document.getElementById('dataDisplay').innerHTML = html;
+        }
+        
+        function testEdit() {
+            showMessage('Тестируем редактирование...', 'info');
+            
+            // Редактируем контакт Иван Петров (ID 15)
+            const data = {
+                type: 'contacts',
+                id: 15,
+                firstName: 'Иван (тест)',
+                lastName: 'Петров'
+                // НЕ передаем deals - должны сохраниться существующие
+            };
+            
+            fetch('/index.php?r=site/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    showMessage('Контакт обновлен! Проверяем данные...', 'success');
+                    setTimeout(loadData, 1000);
+                } else {
+                    showMessage('Ошибка: ' + JSON.stringify(result), 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('Ошибка: ' + error.message, 'error');
+            });
+        }
+        
+        function synchronize() {
+            showMessage('Синхронизация...', 'info');
+            
+            fetch('/index.php?r=site/synchronize')
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        showMessage('Синхронизация успешна!', 'success');
+                        setTimeout(loadData, 1000);
+                    } else {
+                        showMessage('Ошибка синхронизации: ' + JSON.stringify(result), 'error');
+                    }
+                })
+                .catch(error => {
+                    showMessage('Ошибка: ' + error.message, 'error');
+                });
+        }
+        
+        function showMessage(message, type) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `<div class="${type}">${message}</div>`;
+        }
+        
+        // Автоматически загружаем данные при открытии страницы
+        window.onload = function() {
+            loadData();
+        };
+    </script>
+</body>
+</html>

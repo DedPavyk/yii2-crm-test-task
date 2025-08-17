@@ -4,15 +4,59 @@
             "id": 1,
             "name": "Хотят люстру",
             "amount": 15000,
-            "contacts": [15, 25]
+            "contacts": [
+                15,
+                19,
+                18
+            ]
+        },
+        {
+            "id": 16,
+            "name": "Хотят светильник",
+            "amount": 9000,
+            "contacts": [
+                18,
+                19
+            ]
+        },
+        {
+            "id": 17,
+            "name": "Пока думают",
+            "amount": 4000,
+            "contacts": [
+                18,
+                19
+            ]
         }
     ],
     "contacts": [
         {
             "id": 15,
             "firstName": "Иван",
-            "lastName": "Петров", 
-            "deals": [1, 14, 2]
+            "lastName": "Петров",
+            "deals": [
+                1
+            ]
+        },
+        {
+            "id": 18,
+            "firstName": "Василий",
+            "lastName": "Иванов",
+            "deals": [
+                1,
+                16,
+                17
+            ]
+        },
+        {
+            "id": 19,
+            "firstName": "Наталья",
+            "lastName": "Сидорова",
+            "deals": [
+                1,
+                16,
+                17
+            ]
         }
     ]
 }

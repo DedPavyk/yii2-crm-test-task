@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Тест синхронизации</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        .success { color: green; }
+        .error { color: red; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>Тест синхронизации связей</h1>
+    
+    <div class="section">
+        <h2>Синхронизация связей</h2>
+        <button onclick="synchronize()">Синхронизировать связи</button>
+        <div id="syncResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Проверка данных</h2>
+        <button onclick="checkContacts()">Проверить контакты</button>
+        <button onclick="checkDeals()">Проверить сделки</button>
+        <div id="checkResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Создать тестовую связь</h2>
+        <button onclick="createTestRelation()">Создать тестовую связь</button>
+        <div id="createResult"></div>
+    </div>
+    
+    <script>
+        function synchronize() {
+            fetch('/site/synchronize')
+                .then(response => response.json())
+                .then(result => {
+                    document.getElementById('syncResult').innerHTML = 
+                        '<div class="' + (result.success ? 'success' : 'error') + '">' +
+                        JSON.stringify(result, null, 2) + '</div>';
+                })
+                .catch(error => {
+                    document.getElementById('syncResult').innerHTML = 
+                        '<div class="error">Ошибка: ' + error.message + '</div>';
+                });
+        }
+        
+        function checkContacts() {
+            fetch('/site/get-list?type=contacts')
+                .then(response => response.json())
+                .then(result => {
+                    let html = '<h3>Контакты:</h3><pre>';
+                    result.forEach(contact => {
+                        html += `ID: ${contact.id}, Имя: ${contact.name}\n`;
+                    });
+                    html += '</pre>';
+                    document.getElementById('checkResult').innerHTML = html;
+                })
+                .catch(error => {
+                    document.getElementById('checkResult').innerHTML = 
+                        '<div class="error">Ошибка: ' + error.message + '</div>';
+                });
+        }
+        
+        function checkDeals() {
+            fetch('/site/get-list?type=deals')
+                .then(response => response.json())
+                .then(result => {
+                    let html = '<h3>Сделки:</h3><pre>';
+                    result.forEach(deal => {
+                        html += `ID: ${deal.id}, Название: ${deal.name}\n`;
+                    });
+                    html += '</pre>';
+                    document.getElementById('checkResult').innerHTML = html;
+                })
+                .catch(error => {
+                    document.getElementById('checkResult').innerHTML = 
+                        '<div class="error">Ошибка: ' + error.message + '</div>';
+                });
+        }
+        
+        function createTestRelation() {
+            // Создаем новую сделку с привязкой к существующему контакту
+            const data = {
+                type: 'deals',
+                name: 'Тестовая сделка ' + Date.now(),
+                amount: 1000,
+                contacts: [15] // ID существующего контакта
+            };
+            
+            fetch('/site/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                document.getElementById('createResult').innerHTML = 
+                    '<div class="' + (result.success ? 'success' : 'error') + '">' +
+                    'Результат создания: ' + JSON.stringify(result, null, 2) + '</div>';
+                
+                if (result.success) {
+                    // Автоматически синхронизируем после создания
+                    setTimeout(synchronize, 500);
+                }
+            })
+            .catch(error => {
+                document.getElementById('createResult').innerHTML = 
+                    '<div class="error">Ошибка: ' + error.message + '</div>';
+            });
+        }
+    </script>
+</body>
+</html>

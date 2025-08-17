@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Тест сохранения</title>
+    <meta charset="utf-8">
+</head>
+<body>
+    <h1>Тест сохранения данных</h1>
+    
+    <h2>Создать новый контакт</h2>
+    <form id="contactForm">
+        <input type="text" id="firstName" placeholder="Имя" required><br>
+        <input type="text" id="lastName" placeholder="Фамилия"><br>
+        <button type="submit">Сохранить контакт</button>
+    </form>
+    
+    <h2>Создать новую сделку</h2>
+    <form id="dealForm">
+        <input type="text" id="dealName" placeholder="Название сделки" required><br>
+        <input type="number" id="amount" placeholder="Сумма" min="0"><br>
+        <button type="submit">Сохранить сделку</button>
+    </form>
+    
+    <div id="result"></div>
+    
+    <script>
+        document.getElementById('contactForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const data = {
+                type: 'contacts',
+                firstName: document.getElementById('firstName').value,
+                lastName: document.getElementById('lastName').value,
+                deals: []
+            };
+            
+            fetch('/site/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                document.getElementById('result').innerHTML = '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+            })
+            .catch(error => {
+                document.getElementById('result').innerHTML = 'Ошибка: ' + error.message;
+            });
+        });
+        
+        document.getElementById('dealForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const data = {
+                type: 'deals',
+                name: document.getElementById('dealName').value,
+                amount: document.getElementById('amount').value,
+                contacts: []
+            };
+            
+            fetch('/site/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                document.getElementById('result').innerHTML = '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+            })
+            .catch(error => {
+                document.getElementById('result').innerHTML = 'Ошибка: ' + error.message;
+            });
+        });
+    </script>
+</body>
+</html>

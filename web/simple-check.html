@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Простая проверка данных CRM</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        .success { color: green; }
+        .error { color: red; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 3px; }
+        .data-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        .data-table th, .data-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .data-table th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>Простая проверка данных CRM</h1>
+    
+    <div class="section">
+        <h2>Действия</h2>
+        <button onclick="loadData()">Загрузить данные</button>
+        <button onclick="synchronize()">Синхронизировать</button>
+        <button onclick="showRawData()">Показать сырые данные</button>
+    </div>
+    
+    <div class="section">
+        <h2>Контакты</h2>
+        <div id="contactsDisplay"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Сделки</h2>
+        <div id="dealsDisplay"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Результаты</h2>
+        <div id="results"></div>
+    </div>
+    
+    <script>
+        function loadData() {
+            showMessage('Загрузка данных...', 'info');
+            
+            Promise.all([
+                fetch('/site/get-list?type=contacts').then(r => r.json()),
+                fetch('/site/get-list?type=deals').then(r => r.json())
+            ]).then(([contacts, deals]) => {
+                displayContacts(contacts);
+                displayDeals(deals);
+                showMessage('Данные загружены', 'success');
+            }).catch(error => {
+                showMessage('Ошибка загрузки: ' + error.message, 'error');
+            });
+        }
+        
+        function displayContacts(contacts) {
+            let html = '<table class="data-table">';
+            html += '<tr><th>ID</th><th>Имя</th><th>Фамилия</th><th>Связанные сделки</th></tr>';
+            
+            contacts.forEach(contact => {
+                html += `<tr>
+                    <td>${contact.id}</td>
+                    <td>${contact.firstName || contact.name || 'N/A'}</td>
+                    <td>${contact.lastName || 'N/A'}</td>
+                    <td>${contact.deals ? contact.deals.join(', ') : 'Нет'}</td>
+                </tr>`;
+            });
+            
+            html += '</table>';
+            document.getElementById('contactsDisplay').innerHTML = html;
+        }
+        
+        function displayDeals(deals) {
+            let html = '<table class="data-table">';
+            html += '<tr><th>ID</th><th>Название</th><th>Сумма</th><th>Связанные контакты</th></tr>';
+            
+            deals.forEach(deal => {
+                html += `<tr>
+                    <td>${deal.id}</td>
+                    <td>${deal.name}</td>
+                    <td>${deal.amount || 'N/A'}</td>
+                    <td>${deal.contacts ? deal.contacts.join(', ') : 'Нет'}</td>
+                </tr>`;
+            });
+            
+            html += '</table>';
+            document.getElementById('dealsDisplay').innerHTML = html;
+        }
+        
+        function synchronize() {
+            showMessage('Синхронизация...', 'info');
+            
+            fetch('/site/synchronize')
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        showMessage('Синхронизация успешна!', 'success');
+                        setTimeout(loadData, 500);
+                    } else {
+                        showMessage('Ошибка синхронизации: ' + result.error, 'error');
+                    }
+                })
+                .catch(error => {
+                    showMessage('Ошибка: ' + error.message, 'error');
+                });
+        }
+        
+        function showRawData() {
+            fetch('/site/get-list?type=contacts')
+                .then(response => response.json())
+                .then(contacts => {
+                    let html = '<h3>Сырые данные контактов:</h3><pre>' + JSON.stringify(contacts, null, 2) + '</pre>';
+                    
+                    fetch('/site/get-list?type=deals')
+                        .then(response => response.json())
+                        .then(deals => {
+                            html += '<h3>Сырые данные сделок:</h3><pre>' + JSON.stringify(deals, null, 2) + '</pre>';
+                            document.getElementById('results').innerHTML = html;
+                        });
+                });
+        }
+        
+        function showMessage(message, type) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `<div class="${type}">${message}</div>`;
+        }
+        
+        // Автоматически загружаем данные при открытии страницы
+        window.onload = function() {
+            loadData();
+        };
+    </script>
+</body>
+</html>

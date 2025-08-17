@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест API</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        button { padding: 10px 15px; margin: 5px; background: #007cba; color: white; border: none; cursor: pointer; }
+        button:hover { background: #005a87; }
+        .result { margin: 10px 0; padding: 10px; background: #f5f5f5; border-left: 4px solid #007cba; }
+        .error { border-left-color: #dc3232; }
+        .success { border-left-color: #46b450; }
+    </style>
+</head>
+<body>
+    <h1>Тест API Yii2 CRM</h1>
+    
+    <div class="test-section">
+        <h3>Тест исправления данных</h3>
+        <button onclick="testFixData()">Исправить данные</button>
+        <div id="fix-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Тест получения всех сделок</h3>
+        <button onclick="testGetAllDeals()">Получить все сделки</button>
+        <div id="deals-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Тест сохранения контакта</h3>
+        <button onclick="testSaveContact()">Сохранить тестовый контакт</button>
+        <div id="contact-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Тест сохранения сделки</h3>
+        <button onclick="testSaveDeal()">Сохранить тестовую сделку</button>
+        <div id="deal-result" class="result"></div>
+    </div>
+
+    <script>
+        function showResult(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            element.className = 'result ' + (isError ? 'error' : 'success');
+        }
+
+        async function testFixData() {
+            try {
+                const response = await fetch('/site/fix-data');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('fix-result', data);
+                } else {
+                    showResult('fix-result', data, true);
+                }
+            } catch (error) {
+                showResult('fix-result', { error: error.message }, true);
+            }
+        }
+
+        async function testGetAllDeals() {
+            try {
+                const response = await fetch('/site/get-all-deals');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('deals-result', data);
+                } else {
+                    showResult('deals-result', data, true);
+                }
+            } catch (error) {
+                showResult('deals-result', { error: error.message }, true);
+            }
+        }
+
+        async function testSaveContact() {
+            try {
+                const contactData = {
+                    firstName: 'Тест',
+                    lastName: 'Контакт ' + Date.now(),
+                    deals: []
+                };
+
+                const response = await fetch('/site/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                    },
+                    body: JSON.stringify({
+                        type: 'contacts',
+                        ...contactData
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('contact-result', data);
+                } else {
+                    showResult('contact-result', data, true);
+                }
+            } catch (error) {
+                showResult('contact-result', { error: error.message }, true);
+            }
+        }
+
+        async function testSaveDeal() {
+            try {
+                const dealData = {
+                    name: 'Тестовая сделка ' + Date.now(),
+                    amount: Math.floor(Math.random() * 10000) + 1000,
+                    contacts: []
+                };
+
+                const response = await fetch('/site/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                    },
+                    body: JSON.stringify({
+                        type: 'deals',
+                        ...dealData
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('deal-result', data);
+                } else {
+                    showResult('deal-result', data, true);
+                }
+            } catch (error) {
+                showResult('deal-result', { error: error.message }, true);
+            }
+        }
+    </script>
+</body>
+</html>

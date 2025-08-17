@@ -1,3 +1,10 @@
+<?php
+
+// Определяем константы, если они еще не определены
+defined('YII_DEBUG') or define('YII_DEBUG', true);
+defined('YII_ENV') or define('YII_ENV', 'dev');
+defined('YII_ENV_DEV') or define('YII_ENV_DEV', YII_ENV === 'dev');
+
 $params = require __DIR__ . '/params.php';
 $db = require __DIR__ . '/db.php';
 

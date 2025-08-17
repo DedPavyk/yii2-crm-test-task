@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Диагностика API</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        .success { color: green; }
+        .error { color: red; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 3px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>Диагностика API CRM</h1>
+    
+    <div class="section">
+        <h2>Тест API</h2>
+        <button onclick="testContacts()">Тест контактов</button>
+        <button onclick="testDeals()">Тест сделок</button>
+        <button onclick="testRaw()">Тест сырого ответа</button>
+    </div>
+    
+    <div class="section">
+        <h2>Результаты</h2>
+        <div id="results"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Сырой ответ</h2>
+        <pre id="rawResponse"></pre>
+    </div>
+    
+    <script>
+        function testContacts() {
+            showMessage('Тестируем API контактов...', 'info');
+            
+            fetch('/index.php?r=site/get-list&type=contacts')
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    console.log('Response headers:', response.headers);
+                    return response.text(); // Получаем как текст
+                })
+                .then(text => {
+                    console.log('Raw response:', text);
+                    document.getElementById('rawResponse').textContent = text;
+                    
+                    try {
+                        const data = JSON.parse(text);
+                        if (Array.isArray(data)) {
+                            showMessage(`Контакты загружены: ${data.length} шт.`, 'success');
+                            console.log('Parsed data:', data);
+                        } else {
+                            showMessage('API вернул не массив: ' + typeof data, 'error');
+                        }
+                    } catch (e) {
+                        showMessage('Ошибка парсинга JSON: ' + e.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    showMessage('Ошибка запроса: ' + error.message, 'error');
+                    console.error('Error:', error);
+                });
+        }
+        
+        function testDeals() {
+            showMessage('Тестируем API сделок...', 'info');
+            
+            fetch('/index.php?r=site/get-list&type=deals')
+                .then(response => response.text())
+                .then(text => {
+                    document.getElementById('rawResponse').textContent = text;
+                    
+                    try {
+                        const data = JSON.parse(text);
+                        if (Array.isArray(data)) {
+                            showMessage(`Сделки загружены: ${data.length} шт.`, 'success');
+                        } else {
+                            showMessage('API вернул не массив: ' + typeof data, 'error');
+                        }
+                    } catch (e) {
+                        showMessage('Ошибка парсинга JSON: ' + e.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    showMessage('Ошибка запроса: ' + error.message, 'error');
+                });
+        }
+        
+        function testRaw() {
+            showMessage('Тестируем сырой ответ...', 'info');
+            
+            // Тестируем разные URL
+            const urls = [
+                '/index.php?r=site/get-list&type=contacts',
+                '/index.php?r=site/get-list&type=deals',
+                '/index.php?r=site/index'
+            ];
+            
+            urls.forEach(url => {
+                fetch(url)
+                    .then(response => response.text())
+                    .then(text => {
+                        console.log(`URL: ${url}`);
+                        console.log(`Response: ${text.substring(0, 200)}...`);
+                    })
+                    .catch(error => {
+                        console.error(`Error for ${url}:`, error);
+                    });
+            });
+        }
+        
+        function showMessage(message, type) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `<div class="${type}">${message}</div>`;
+        }
+    </script>
+</body>
+</html>
